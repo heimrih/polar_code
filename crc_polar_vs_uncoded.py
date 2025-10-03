@@ -20,15 +20,6 @@ from polar_code import PolarCode
 from rate_profile import rateprofile
 
 
-try:
-    import matplotlib.pyplot as plt
-except ModuleNotFoundError:  # pragma: no cover - optional dependency for plotting
-    plt = None
-
-
-DEFAULT_SNR_POINTS = [float(f"{x:.1f}") for x in np.arange(-2.0, 6.5, 0.5)]
-
-
 @dataclass
 class SimulationResult:
     """Container for the performance metrics obtained at a single SNR point."""
@@ -223,7 +214,7 @@ def parse_args() -> argparse.Namespace:
         "--snr",
         type=float,
         nargs="*",
-        default=DEFAULT_SNR_POINTS,
+        default=[0.0, 1.0, 2.0, 3.0],
         help="SNR points (in dB) at which to evaluate performance.",
     )
     parser.add_argument(
@@ -244,17 +235,6 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Random number generator seed for reproducibility.",
     )
-    parser.add_argument(
-        "--no-plot",
-        action="store_true",
-        help="Disable plotting of BER/FER curves.",
-    )
-    parser.add_argument(
-        "--plot-file",
-        type=str,
-        default=None,
-        help="Optional path to save the BER/FER figure (implies plotting).",
-    )
     return parser.parse_args()
 
 
@@ -274,50 +254,6 @@ def main() -> None:
         seed=args.seed,
     )
     print(_format_results(results))
-
-    if args.no_plot:
-        return
-
-    if plt is None:
-        print("matplotlib is not installed; skipping plot generation.")
-        return
-
-    _plot_results(results, save_path=args.plot_file, show=args.plot_file is None)
-
-
-def _plot_results(results: Sequence[SimulationResult], save_path: str | None, show: bool) -> None:
-    snr = [res.snr_db for res in results]
-    coded_ber = [res.coded_ber for res in results]
-    uncoded_ber = [res.uncoded_ber for res in results]
-    coded_fer = [res.coded_fer for res in results]
-    uncoded_fer = [res.uncoded_fer for res in results]
-
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True)
-
-    axes[0].semilogy(snr, coded_ber, marker="o", label="Coded BER")
-    axes[0].semilogy(snr, uncoded_ber, marker="s", label="Uncoded BER")
-    axes[0].set_xlabel("SNR (dB)")
-    axes[0].set_ylabel("Bit Error Rate")
-    axes[0].grid(True, which="both", linestyle="--", alpha=0.6)
-    axes[0].legend()
-
-    axes[1].semilogy(snr, coded_fer, marker="o", label="Coded FER")
-    axes[1].semilogy(snr, uncoded_fer, marker="s", label="Uncoded FER")
-    axes[1].set_xlabel("SNR (dB)")
-    axes[1].set_ylabel("Frame Error Rate")
-    axes[1].grid(True, which="both", linestyle="--", alpha=0.6)
-    axes[1].legend()
-
-    fig.suptitle("CRC-Polar vs. Uncoded Performance over AWGN")
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
-
-    if save_path:
-        fig.savefig(save_path, bbox_inches="tight")
-
-    if show:
-        plt.show()
-    else:
-        plt.close(fig)
 
 
 if __name__ == "__main__":
