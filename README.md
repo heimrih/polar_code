@@ -30,6 +30,13 @@ usage:
 
 ```
 python crc_polar_vs_uncoded.py --n 128 --k-info 64 --crc-length 16 --list-size 16 \
+    --target-frame-errors 30 --max-frames 5000 --seed 1 --plot-file results.png
+```
+
+By default the script evaluates SNR points from -2 dB to 6 dB in 0.5 dB
+increments. It prints a table with BER/FER metrics for both schemes and also
+plots semi-log curves for the coded and uncoded BER/FER. Use `--no-plot` if you
+prefer to skip figure generation or `--plot-file` to save the chart to disk.
     --snr 0 1 2 3 --target-frame-errors 30 --max-frames 5000 --seed 1
 ```
 
