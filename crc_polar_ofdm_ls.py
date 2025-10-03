@@ -12,6 +12,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable, List, Sequence
 
+try:
+    import matplotlib.pyplot as plt
+except ImportError:  # pragma: no cover - matplotlib is optional at runtime
+    plt = None
+
 import numpy as np
 
 import polar_coding_functions as pcf
@@ -50,6 +55,8 @@ class SimulationConfig:
     snr_points: Sequence[float] = field(default_factory=lambda: DEFAULT_SNR_POINTS)
     target_frame_errors: int = 30
     max_frames: int = 5000
+    min_frames_per_snr: int = 50
+    stop_when_error_free: bool = True
     seed: int | None = None
 
     # OFDM-specific parameters
@@ -58,6 +65,10 @@ class SimulationConfig:
     channel_taps: int = 8
     ofdm_symbols_per_frame: int | None = None  # ``None`` -> computed automatically
     pilot_value: complex = 1 + 0j
+
+    # Plotting controls
+    plot_results: bool = True
+    plot_file: str | None = None
 
 
 # Modify the values below to customise the simulation without needing command-line flags.
@@ -125,6 +136,9 @@ def simulate(config: SimulationConfig) -> List[SimulationResult]:
         num_symbols = config.ofdm_symbols_per_frame
 
     results: List[SimulationResult] = []
+
+    if config.min_frames_per_snr < 1:
+        raise ValueError("min_frames_per_snr must be at least 1")
 
     for snr in config.snr_points:
         snr_linear = 10 ** (snr / 10.0)
@@ -234,6 +248,14 @@ def simulate(config: SimulationConfig) -> List[SimulationResult]:
 
             frames += 1
 
+            if (
+                config.stop_when_error_free
+                and frames >= config.min_frames_per_snr
+                and ls_frame_errors == 0
+                and perfect_frame_errors == 0
+            ):
+                break
+
         ls_ber = ls_bit_errors / bits_total if bits_total else 0.0
         ls_fer = ls_frame_errors / frames if frames else 0.0
         perfect_ber = perfect_bit_errors / bits_total if bits_total else 0.0
@@ -272,6 +294,43 @@ def _format_results(results: Iterable[SimulationResult]) -> str:
 def main(config: SimulationConfig = CONFIG) -> None:
     results = simulate(config)
     print(_format_results(results))
+
+    if config.plot_results:
+        if plt is None:
+            raise RuntimeError(
+                "matplotlib is required for plotting but is not installed. "
+                "Either install matplotlib or set config.plot_results to False."
+            )
+
+        snrs = [res.snr_db for res in results]
+        ls_ber = [res.ls_ber for res in results]
+        ls_fer = [res.ls_fer for res in results]
+        perfect_ber = [res.perfect_ber for res in results]
+        perfect_fer = [res.perfect_fer for res in results]
+
+        def _safe(values: Sequence[float]) -> np.ndarray:
+            arr = np.asarray(values, dtype=float)
+            return np.maximum(arr, 1e-12)
+
+        plt.figure(figsize=(8, 6))
+        plt.semilogy(snrs, _safe(ls_ber), marker="o", label="LS BER")
+        plt.semilogy(snrs, _safe(perfect_ber), marker="o", label="Perfect CSI BER")
+        plt.semilogy(snrs, _safe(ls_fer), marker="s", label="LS FER")
+        plt.semilogy(snrs, _safe(perfect_fer), marker="s", label="Perfect CSI FER")
+        plt.xlabel("SNR (dB)")
+        plt.ylabel("Error Rate")
+        plt.title("CRC-Polar over OFDM: LS vs. Perfect CSI")
+        plt.grid(True, which="both", ls="--", alpha=0.5)
+        plt.legend()
+        plt.tight_layout()
+
+        if config.plot_file:
+            plt.savefig(config.plot_file, dpi=150)
+
+        if config.plot_file is None:
+            plt.show()
+        else:
+            plt.close()
 
 
 if __name__ == "__main__":

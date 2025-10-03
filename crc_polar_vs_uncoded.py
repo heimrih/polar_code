@@ -51,6 +51,8 @@ def simulate(
     snr_points: Sequence[float],
     target_frame_errors: int,
     max_frames: int,
+    min_frames_per_snr: int,
+    stop_when_error_free: bool,
     snr_mode: str = "SNRb",
     modulation: str = "BPSK",
     seed: int | None = None,
@@ -58,6 +60,9 @@ def simulate(
     """Run a Monte-Carlo simulation for several SNR points."""
 
     rng = np.random.default_rng(seed)
+
+    if min_frames_per_snr < 1:
+        raise ValueError("min_frames_per_snr must be at least 1")
 
     non_frozen_bits = k_info + crc_length
     rate = k_info / n
@@ -128,6 +133,14 @@ def simulate(
 
             frames += 1
 
+            if (
+                stop_when_error_free
+                and frames >= min_frames_per_snr
+                and coded_frame_errors == 0
+                and uncoded_frame_errors == 0
+            ):
+                break
+
         coded_ber = coded_bit_errors / coded_bits_total if coded_bits_total else 0.0
         coded_fer = coded_frame_errors / frames if frames else 0.0
         uncoded_ber = uncoded_bit_errors / uncoded_bits_total if uncoded_bits_total else 0.0
@@ -162,10 +175,14 @@ def _format_results(results: Iterable[SimulationResult]) -> str:
 
 def _plot_results(results: Sequence[SimulationResult], save_path: str | None, show: bool) -> None:
     snr = [res.snr_db for res in results]
-    coded_ber = [res.coded_ber for res in results]
-    uncoded_ber = [res.uncoded_ber for res in results]
-    coded_fer = [res.coded_fer for res in results]
-    uncoded_fer = [res.uncoded_fer for res in results]
+    def _safe(values: Sequence[float]) -> np.ndarray:
+        arr = np.asarray(values, dtype=float)
+        return np.maximum(arr, 1e-12)
+
+    coded_ber = _safe([res.coded_ber for res in results])
+    uncoded_ber = _safe([res.uncoded_ber for res in results])
+    coded_fer = _safe([res.coded_fer for res in results])
+    uncoded_fer = _safe([res.uncoded_fer for res in results])
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True)
 
@@ -209,6 +226,8 @@ class SimulationConfig:
     snr_points: Sequence[float] = field(default_factory=lambda: DEFAULT_SNR_POINTS)
     target_frame_errors: int = 30
     max_frames: int = 5000
+    min_frames_per_snr: int = 50
+    stop_when_error_free: bool = True
     seed: int | None = None
     plot_results: bool = True
     plot_file: str | None = None
@@ -230,6 +249,8 @@ def main(config: SimulationConfig = CONFIG) -> None:
         snr_points=config.snr_points,
         target_frame_errors=config.target_frame_errors,
         max_frames=config.max_frames,
+        min_frames_per_snr=config.min_frames_per_snr,
+        stop_when_error_free=config.stop_when_error_free,
         seed=config.seed,
     )
     print(_format_results(results))

@@ -36,9 +36,12 @@ python crc_polar_vs_uncoded.py
 Configuration is done by editing the `CONFIG` object near the bottom of the
 script. There you can adjust the block length, CRC length/polynomial, list size,
 SNR sweep, stopping criteria, RNG seed, and plotting preferences without
-touching any command-line flags. By default the script evaluates SNR points from
--2 dB to 6 dB in 0.5 dB increments, prints a BER/FER summary table for both
-schemes, and renders semi-log BER/FER curves when `matplotlib` is available. Set
+touching any command-line flags. The `CONFIG.min_frames_per_snr` and
+`CONFIG.stop_when_error_free` options help accelerate high-SNR points by
+terminating once no frame errors have been observed for the configured minimum
+number of frames. By default the script evaluates SNR points from -2 dB to 6 dB
+in 0.5 dB increments, prints a BER/FER summary table for both schemes, and
+renders semi-log BER/FER curves when `matplotlib` is available. Set
 `CONFIG.plot_results = False` if you prefer to skip figure generation or provide
 `CONFIG.plot_file` to save the chart to disk instead of displaying it.
 
@@ -48,7 +51,10 @@ schemes, and renders semi-log BER/FER curves when `matplotlib` is available. Set
 least-squares OFDM channel estimator to compare performance against an ideal
 receiver with perfect channel knowledge. Edit the in-file `CONFIG` object to set
 the polar-code parameters, OFDM layout (subcarriers, pilot spacing, number of
-OFDM symbols per frame, channel taps), and the SNR sweep. Running
+OFDM symbols per frame, channel taps), and the SNR sweep. The
+`CONFIG.min_frames_per_snr` and `CONFIG.stop_when_error_free` knobs let you exit
+early at high SNR once no frame errors have been observed for the chosen number
+of frames. Running
 
 ```
 python crc_polar_ofdm_ls.py
@@ -56,4 +62,7 @@ python crc_polar_ofdm_ls.py
 
 prints a table that includes BER/FER for the LS-estimated receiver, the perfect
 CSI baseline, and the average channel-estimation MSE accumulated across the
-simulation.
+simulation. When `matplotlib` is available the script also renders a semi-log
+plot of the BER/FER curves for both receivers; set `CONFIG.plot_results = False`
+to skip figure generation or `CONFIG.plot_file = "ofdm_ls.png"` to save the
+chart instead of displaying it.
