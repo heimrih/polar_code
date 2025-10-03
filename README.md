@@ -41,3 +41,19 @@ touching any command-line flags. By default the script evaluates SNR points from
 schemes, and renders semi-log BER/FER curves when `matplotlib` is available. Set
 `CONFIG.plot_results = False` if you prefer to skip figure generation or provide
 `CONFIG.plot_file` to save the chart to disk instead of displaying it.
+
+## CRC-polar over OFDM with LS channel estimation
+
+`crc_polar_ofdm_ls.py` builds on the CRC-polar encoder/decoder together with the
+least-squares OFDM channel estimator to compare performance against an ideal
+receiver with perfect channel knowledge. Edit the in-file `CONFIG` object to set
+the polar-code parameters, OFDM layout (subcarriers, pilot spacing, number of
+OFDM symbols per frame, channel taps), and the SNR sweep. Running
+
+```
+python crc_polar_ofdm_ls.py
+```
+
+prints a table that includes BER/FER for the LS-estimated receiver, the perfect
+CSI baseline, and the average channel-estimation MSE accumulated across the
+simulation.
