@@ -20,3 +20,18 @@ To switch between decoding polar codes and PAC codes, you need to change the gen
 Note that the "copy on write" or "lazy copy" technique has been used in this algorithm.
 
 Please report any bugs to mrowshan at ieee dot org
+
+## CRC-polar vs. uncoded baseline simulation
+
+The repository now includes a helper script, `crc_polar_vs_uncoded.py`, which
+uses the existing encoder/decoder to compare the performance of a CRC-aided
+polar code against an uncoded BPSK transmission over an AWGN channel. Example
+usage:
+
+```
+python crc_polar_vs_uncoded.py --n 128 --k-info 64 --crc-length 16 --list-size 16 \
+    --snr 0 1 2 3 --target-frame-errors 30 --max-frames 5000 --seed 1
+```
+
+The script prints a table with BER/FER metrics for both schemes across the
+requested SNR points.
