@@ -1,14 +1,15 @@
 """Simulation comparing CRC-aided polar coding against an uncoded BPSK baseline.
 
-The script reuses the existing polar code implementation with the convolutional
-precoder disabled (conv_gen=[1]) and measures bit/frame error rate under an
-AWGN channel. Results for both the coded and uncoded schemes are reported for
-each SNR point.
+Edit the :data:`CONFIG` object near the bottom of the file to tweak parameters
+such as block length, CRC, list size, SNR sweep, stopping criteria, or plotting
+behaviour. Running ``python crc_polar_vs_uncoded.py`` will execute the
+simulation using the chosen configuration and print a summary table. When
+``matplotlib`` is available a BER/FER figure is also displayed or optionally
+saved to disk.
 """
 from __future__ import annotations
 
-import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable, List, Sequence
 
 import numpy as np
@@ -18,6 +19,13 @@ from channel import channel
 from crclib import crc
 from polar_code import PolarCode
 from rate_profile import rateprofile
+
+try:
+    import matplotlib.pyplot as plt
+except ModuleNotFoundError:  # pragma: no cover - optional dependency for plotting
+    plt = None
+
+DEFAULT_SNR_POINTS = tuple(float(f"{x:.1f}") for x in np.arange(-2.0, 6.5, 0.5))
 
 
 @dataclass
@@ -47,39 +55,7 @@ def simulate(
     modulation: str = "BPSK",
     seed: int | None = None,
 ) -> List[SimulationResult]:
-    """Run a Monte-Carlo simulation for several SNR points.
-
-    Parameters
-    ----------
-    n: int
-        Polar code block length (must be a power of two).
-    k_info: int
-        Number of information bits (CRC bits are appended to these).
-    crc_length: int
-        Length of the CRC appended to the information bits. Set to zero for no CRC.
-    crc_poly: int
-        Generator polynomial corresponding to ``crc_length``.
-    list_size: int
-        SCL decoder list size.
-    design_snr_db: float
-        Design SNR used for the rate-profile construction.
-    profile_name: str
-        Name of the rate profile to use (e.g., "dega", "rm-polar").
-    snr_points: Sequence[float]
-        Iterable with SNR points (in dB) at which to evaluate performance.
-    target_frame_errors: int
-        Stop the simulation for a given SNR once this many frame errors are
-        accumulated (for the coded scheme).
-    max_frames: int
-        Upper bound on the number of frames to simulate per SNR point.
-    snr_mode: str
-        Either "SNR" (Es/N0) or "SNRb" (Eb/N0). Default is "SNRb".
-    modulation: str
-        Modulation scheme supported by :class:`~channel.channel`. Only BPSK is
-        meaningful for the uncoded comparison.
-    seed: int | None
-        Optional NumPy random generator seed for reproducibility.
-    """
+    """Run a Monte-Carlo simulation for several SNR points."""
 
     rng = np.random.default_rng(seed)
 
@@ -184,76 +160,88 @@ def _format_results(results: Iterable[SimulationResult]) -> str:
     return "\n".join([header, *rows])
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Compare CRC-aided polar coding with an uncoded baseline over AWGN."
-    )
-    parser.add_argument("--n", type=int, default=128, help="Code length (must be power of two).")
-    parser.add_argument("--k-info", type=int, default=64, help="Number of information bits per block.")
-    parser.add_argument("--crc-length", type=int, default=16, help="CRC length in bits.")
-    parser.add_argument(
-        "--crc-poly",
-        type=lambda x: int(x, 0),
-        default="0x1021",
-        help="Generator polynomial for the CRC (accepts hex literals).",
-    )
-    parser.add_argument("--list-size", type=int, default=16, help="List size for the SCL decoder.")
-    parser.add_argument(
-        "--design-snr",
-        type=float,
-        default=2.0,
-        help="Design SNR (in dB) used when building the rate profile.",
-    )
-    parser.add_argument(
-        "--profile",
-        type=str,
-        default="dega",
-        help="Rate profile identifier (see rate_profile.py for supported names).",
-    )
-    parser.add_argument(
-        "--snr",
-        type=float,
-        nargs="*",
-        default=[0.0, 1.0, 2.0, 3.0],
-        help="SNR points (in dB) at which to evaluate performance.",
-    )
-    parser.add_argument(
-        "--target-frame-errors",
-        type=int,
-        default=30,
-        help="Stop simulation at an SNR point once this many coded frame errors are observed.",
-    )
-    parser.add_argument(
-        "--max-frames",
-        type=int,
-        default=5000,
-        help="Maximum number of frames to simulate per SNR point.",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=None,
-        help="Random number generator seed for reproducibility.",
-    )
-    return parser.parse_args()
+def _plot_results(results: Sequence[SimulationResult], save_path: str | None, show: bool) -> None:
+    snr = [res.snr_db for res in results]
+    coded_ber = [res.coded_ber for res in results]
+    uncoded_ber = [res.uncoded_ber for res in results]
+    coded_fer = [res.coded_fer for res in results]
+    uncoded_fer = [res.uncoded_fer for res in results]
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True)
+
+    axes[0].semilogy(snr, coded_ber, marker="o", label="Coded BER")
+    axes[0].semilogy(snr, uncoded_ber, marker="s", label="Uncoded BER")
+    axes[0].set_xlabel("SNR (dB)")
+    axes[0].set_ylabel("Bit Error Rate")
+    axes[0].grid(True, which="both", linestyle="--", alpha=0.6)
+    axes[0].legend()
+
+    axes[1].semilogy(snr, coded_fer, marker="o", label="Coded FER")
+    axes[1].semilogy(snr, uncoded_fer, marker="s", label="Uncoded FER")
+    axes[1].set_xlabel("SNR (dB)")
+    axes[1].set_ylabel("Frame Error Rate")
+    axes[1].grid(True, which="both", linestyle="--", alpha=0.6)
+    axes[1].legend()
+
+    fig.suptitle("CRC-Polar vs. Uncoded Performance over AWGN")
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+
+    if save_path:
+        fig.savefig(save_path, bbox_inches="tight")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
 
 
-def main() -> None:
-    args = parse_args()
+@dataclass
+class SimulationConfig:
+    """Tunable parameters for the CRC-polar vs. uncoded comparison."""
+
+    n: int = 128
+    k_info: int = 64
+    crc_length: int = 16
+    crc_poly: int = 0x1021
+    list_size: int = 16
+    design_snr_db: float = 2.0
+    profile_name: str = "dega"
+    snr_points: Sequence[float] = field(default_factory=lambda: DEFAULT_SNR_POINTS)
+    target_frame_errors: int = 30
+    max_frames: int = 5000
+    seed: int | None = None
+    plot_results: bool = True
+    plot_file: str | None = None
+
+
+# Modify the values below to customise the simulation without needing command-line flags.
+CONFIG = SimulationConfig()
+
+
+def main(config: SimulationConfig = CONFIG) -> None:
     results = simulate(
-        n=args.n,
-        k_info=args.k_info,
-        crc_length=args.crc_length,
-        crc_poly=args.crc_poly,
-        list_size=args.list_size,
-        design_snr_db=args.design_snr,
-        profile_name=args.profile,
-        snr_points=args.snr,
-        target_frame_errors=args.target_frame_errors,
-        max_frames=args.max_frames,
-        seed=args.seed,
+        n=config.n,
+        k_info=config.k_info,
+        crc_length=config.crc_length,
+        crc_poly=config.crc_poly,
+        list_size=config.list_size,
+        design_snr_db=config.design_snr_db,
+        profile_name=config.profile_name,
+        snr_points=config.snr_points,
+        target_frame_errors=config.target_frame_errors,
+        max_frames=config.max_frames,
+        seed=config.seed,
     )
     print(_format_results(results))
+
+    if not config.plot_results:
+        return
+
+    if plt is None:
+        print("matplotlib is not installed; skipping plot generation.")
+        return
+
+    _plot_results(results, save_path=config.plot_file, show=config.plot_file is None)
 
 
 if __name__ == "__main__":
