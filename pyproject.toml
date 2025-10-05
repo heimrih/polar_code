@@ -1,0 +1,19 @@
+[project]
+name = "dl-scl-polar"
+version = "0.1.0"
+description = "Deep-learning-guided SCL polar decoding experiments"
+authors = [{name = "DL-SCL Team"}]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "torch",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["."]

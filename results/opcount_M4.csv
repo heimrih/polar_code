@@ -1,0 +1,3 @@
+stage,nonzero,multiplies,adds
+full,4096,4096,4032
+pruned,4032,4032,3968
