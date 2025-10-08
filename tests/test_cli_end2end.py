@@ -50,8 +50,39 @@ def test_cli_end2end(tmp_path):
         seed=4321,
         out_dir=str(tmp_path / "results"),
         plot_dir=str(tmp_path / "plots"),
+        include_uncoded=False,
     )
     run_sweep(sweep_args)
 
     assert (tmp_path / "results" / "fer_M2.csv").exists()
     assert (tmp_path / "plots" / "fer_M2.png").exists()
+
+    with (tmp_path / "results" / "fer_M2.csv").open() as f:
+        header = f.readline().strip().split(",")
+        assert header == ["snr_db", "fer_scl", "ber_scl", "fer_dl", "ber_dl"]
+        row = f.readline().strip().split(",")
+        assert len(row) == len(header)
+
+    sweep_args_uncoded = Namespace(
+        M=2,
+        frames=100,
+        snr_lo=4.5,
+        snr_hi=4.5,
+        snr_step=0,
+        retries=2,
+        beta=str(ckpt_path),
+        seed=9876,
+        out_dir=str(tmp_path / "results_uncoded"),
+        plot_dir=str(tmp_path / "plots_uncoded"),
+        include_uncoded=True,
+    )
+    run_sweep(sweep_args_uncoded)
+
+    assert (tmp_path / "results_uncoded" / "fer_M2.csv").exists()
+    assert (tmp_path / "plots_uncoded" / "fer_M2.png").exists()
+
+    with (tmp_path / "results_uncoded" / "fer_M2.csv").open() as f:
+        header = f.readline().strip().split(",")
+        assert header == ["snr_db", "fer_uncoded", "ber_uncoded", "fer_scl", "ber_scl", "fer_dl", "ber_dl"]
+        row = f.readline().strip().split(",")
+        assert len(row) == len(header)

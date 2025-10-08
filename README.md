@@ -84,6 +84,42 @@ Outputs:
 - `plots/fer_M4.png`
 
 Adjust M, β checkpoint, SNR grid, and frame count as needed.
+CSV columns include frame-error and bit-error rates (`fer_*`, `ber_*`). Add
+`--include_uncoded` to simulate an uncoded BPSK baseline; this adds
+`fer_uncoded`/`ber_uncoded` columns and a third curve to the plot.
+
+### 3b. BER/FER Sweeps Across Schemes
+
+```
+python -m dl_scl_polar.eval.run_ber_sweep --scheme polar_scl \
+    --K_payload 64 --K_crc 24 --E 128 --M 4 \
+    --EbN0_lo 1.0 --EbN0_hi 6.5 --EbN0_step 0.5 \
+    --bits_cap 1e7 --err_cap 1000 \
+    --out results/ber_polar_M4.csv --plot plots/ber_polar_M4.png
+
+python -m dl_scl_polar.eval.run_ber_sweep --scheme dl_scl \
+    --K_payload 64 --K_crc 24 --E 128 --M 4 --retries 8 \
+    --beta checkpoints/beta_M4.npy \
+    --EbN0_lo 1.0 --EbN0_hi 6.5 --EbN0_step 0.5 \
+    --bits_cap 1e7 --err_cap 1000 \
+    --out results/ber_dlscl_M4.csv --plot plots/ber_dlscl_M4.png
+
+python -m dl_scl_polar.eval.run_ber_sweep --scheme nr_polar_scl \
+    --K_payload 64 --K_crc 24 --N 128 --E 256 --M 4 \
+    --EbN0_lo 1.0 --EbN0_hi 6.5 --EbN0_step 0.5 \
+    --bits_cap 1e7 --err_cap 1000 \
+    --out results/ber_nrpolar_E256_M4.csv --plot plots/ber_nrpolar_E256_M4.png
+
+python -m dl_scl_polar.eval.run_ber_sweep --scheme nr_ldpc \
+    --K_payload 64 --K_crc 24 --E 384 --bg 2 --Z 32 \
+    --max_iter 20 --alpha 0.8 \
+    --EbN0_lo 1.0 --EbN0_hi 6.5 --EbN0_step 0.5 \
+    --bits_cap 1e7 --err_cap 1000 \
+    --out results/ber_nrldpc.csv --plot plots/ber_nrldpc.png
+```
+
+Each run writes a CSV with payload-only BER/FER and average work (retries or LDPC
+iterations). Use `--plot` to save a BER/FER overlay for that scheme.
 
 ### 4. Complexity Accounting
 
